@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monsoon Cleaning Portal</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-brand">
+      <span class="logo">🌧</span>
+      <div>
+        <h1>CDA GSTW Monsoon Portal</h1>
+        <p class="subtitle">Islamabad field clearance tracker</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-value" id="stat-total">0</span>
+        <span class="stat-label">Total</span>
+      </div>
+      <div class="stat stat-done">
+        <span class="stat-value" id="stat-done">0</span>
+        <span class="stat-label">Done</span>
+      </div>
+      <div class="stat stat-pending">
+        <span class="stat-value" id="stat-pending">0</span>
+        <span class="stat-label">Pending</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="stat-percent">0%</span>
+        <span class="stat-label">Complete</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <label class="btn btn-primary" for="excel-input">
+        Import Excel
+        <input type="file" id="excel-input" accept=".xlsx,.xls,.csv" hidden />
+      </label>
+      <button class="btn btn-secondary" id="btn-export" type="button">Export Status</button>
+      <button class="btn btn-ghost" id="btn-reset" type="button" title="Reload field data">Reload Data</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <h2>Map View</h2>
+        <div class="layer-buttons" id="layer-buttons">
+          <button type="button" class="layer-btn active" data-layer="osm">Street (OSM)</button>
+          <button type="button" class="layer-btn" data-layer="hybrid">Hybrid</button>
+          <button type="button" class="layer-btn" data-layer="satellite">Satellite</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2>Layers</h2>
+        <label class="layer-toggle">
+          <input type="checkbox" id="waterways-toggle" checked />
+          <span>Show waterways (nullah routes)</span>
+        </label>
+      </div>
+
+      <div class="sidebar-section">
+        <h2>Filter</h2>
+        <div class="filter-row">
+          <button type="button" class="filter-btn active" data-filter="all">All</button>
+          <button type="button" class="filter-btn" data-filter="done">Done</button>
+          <button type="button" class="filter-btn" data-filter="pending">Pending</button>
+        </div>
+        <input type="search" id="search-input" class="search-input" placeholder="Search by name, Sr.#, category..." />
+        <select id="category-filter" class="search-input category-select" aria-label="Filter by category">
+          <option value="all">All categories</option>
+        </select>
+      </div>
+
+      <div class="sidebar-section sidebar-list-section">
+        <h2>Points <span id="list-count" class="badge">0</span></h2>
+        <ul id="point-list" class="point-list"></ul>
+      </div>
+
+      <div class="legend">
+        <span class="legend-item"><span class="dot dot-done"></span> Done (cleaned)</span>
+        <span class="legend-item"><span class="dot dot-pending"></span> Pending (not done)</span>
+        <span class="legend-item"><span class="shape-icon shape-culvert pending"></span> Culvert</span>
+        <span class="legend-item"><span class="shape-icon shape-bridge pending"></span> Bridge</span>
+        <span class="legend-item"><span class="line line-waterway"></span> Waterway / nullah</span>
+      </div>
+    </aside>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
