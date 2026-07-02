@@ -22,6 +22,7 @@ let activeFilter = "all";
 let activeCategory = "all";
 let searchQuery = "";
 let selectedId = null;
+let mapViewInitialized = false;
 
 const layers = {};
 
@@ -245,8 +246,9 @@ async function loadFieldData() {
 }
 
 function fitMapToData() {
-  const bounds = [];
+  if (mapViewInitialized) return;
 
+  const bounds = [];
   points.forEach((p) => bounds.push([p.lat, p.lng]));
   if (showWaterways) {
     waterways.forEach((w) => {
@@ -256,6 +258,7 @@ function fitMapToData() {
 
   if (bounds.length) {
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    mapViewInitialized = true;
   }
 }
 
@@ -464,7 +467,6 @@ function renderList() {
 function renderMarkers() {
   markerLayer.clearLayers();
   const filtered = getFilteredPoints();
-  const bounds = [];
 
   filtered.forEach((point) => {
     const marker = L.marker([point.lat, point.lng], {
@@ -483,12 +485,7 @@ function renderMarkers() {
     });
 
     marker.addTo(markerLayer);
-    bounds.push([point.lat, point.lng]);
   });
-
-  if (bounds.length && !selectedId) {
-    fitMapToData();
-  }
 }
 
 function refreshUI() {
@@ -532,6 +529,10 @@ function initMap() {
 
   markerLayer = L.layerGroup().addTo(map);
   waterwayLayer = L.layerGroup().addTo(map);
+
+  map.on("zoomstart movestart", () => {
+    mapViewInitialized = true;
+  });
 }
 
 function setBaseLayer(name) {
