@@ -36,14 +36,6 @@ function showToast(message) {
   }, 2800);
 }
 
-function makeId(name, lat, lng, index) {
-  const slug = String(name || "point")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .slice(0, 40);
-  return `${slug}-${lat}-${lng}-${index}`;
-}
-
 function normalizeStatus(value) {
   const v = String(value ?? "").trim().toLowerCase();
   if (["yes", "y", "done", "completed", "complete", "1", "true", "cleaned", "cleared", "finished"].includes(v)) {
@@ -52,38 +44,60 @@ function normalizeStatus(value) {
   return "pending";
 }
 
-function mergeStatusUpdates(statusRows) {
-  if (!statusRows.length) return false;
+function normalizePoints(raw) {
+  return raw
+    .map((p, index) => {
+      const lat = Number(p.lat ?? p.latitude);
+      const lng = Number(p.lng ?? p.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-  const byId = new Map(statusRows.map((row) => [row.id, row]));
-  let changed = false;
+      const sr = Number(p.sr) || index + 1;
+      const id = String(p.id || `sr-${sr}`).trim();
+      const status = normalizeStatus(p.status);
 
-  points = points.map((point) => {
-    const remote = byId.get(point.id);
-    if (!remote) return point;
-
-    const nextStatus = remote.status === "done" ? "done" : "pending";
-    if (point.status !== nextStatus || point.updatedAt !== remote.updatedAt) {
-      changed = true;
       return {
-        ...point,
-        status: nextStatus,
-        updatedAt: remote.updatedAt || point.updatedAt,
-        progress: nextStatus === "done" ? 100 : point.progress,
+        id,
+        sr,
+        name: String(p.name || `${p.category || "Point"} #${sr}`).trim(),
+        category: String(p.category || "").trim(),
+        lat,
+        lng,
+        status,
+        progress: status === "done" ? 100 : Number(p.progress) || 0,
+        updatedAt: p.updatedAt || undefined,
+        area: p.location || p.area || undefined,
+        landmark: p.landmark || undefined,
+        team: p.team || undefined,
+        remarks: p.remarks || undefined,
       };
-    }
-    return point;
-  });
-
-  return changed;
+    })
+    .filter(Boolean);
 }
 
-async function fetchRemoteStatus() {
+function pointSignature(p) {
+  return [p.id, p.lat, p.lng, p.status, p.name, p.category].join("|");
+}
+
+function applyRemotePoints(remoteRaw) {
+  const next = normalizePoints(remoteRaw);
+  if (!next.length) return false;
+
+  const currentSig = points.map(pointSignature).join(";");
+  const nextSig = next.map(pointSignature).join(";");
+  if (currentSig === nextSig) return false;
+
+  points = next;
+  return true;
+}
+
+async function fetchRemotePoints() {
   const { sheetsApiUrl } = getConfig();
   const res = await fetch(`${sheetsApiUrl}?t=${Date.now()}`);
-  if (!res.ok) throw new Error("Failed to fetch status");
+  if (!res.ok) throw new Error("Failed to fetch sheet");
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  if (data && data.ok === false) throw new Error(data.error || "Sheet error");
+  if (!Array.isArray(data)) throw new Error("Invalid sheet response");
+  return data;
 }
 
 async function pushStatusUpdate(point) {
@@ -111,9 +125,10 @@ async function syncFromSheet() {
   setSyncBadge("syncing");
 
   try {
-    const remote = await fetchRemoteStatus();
-    const changed = mergeStatusUpdates(remote);
+    const remote = await fetchRemotePoints();
+    const changed = applyRemotePoints(remote);
     if (changed) {
+      populateCategoryFilter();
       saveToStorage();
       refreshUI();
     }
@@ -185,45 +200,25 @@ function mergeWithStored(imported) {
   });
 }
 
-function normalizePoints(raw) {
-  return raw.map((p, index) => ({
-    id: p.id || makeId(p.name, p.lat, p.lng, index),
-    sr: p.sr,
-    name: p.name,
-    category: p.category,
-    lat: p.lat,
-    lng: p.lng,
-    status: p.status === "done" ? "done" : "pending",
-    progress: p.progress ?? 0,
-    updatedAt: p.updatedAt,
-    area: p.location || p.area,
-    landmark: p.landmark,
-    team: p.team,
-    remarks: p.remarks,
-    date: p.date,
-  }));
-}
-
 async function loadFieldData() {
-  const [pointsRes, waterwaysRes] = await Promise.all([
-    fetch("data/points.json"),
-    fetch("data/waterways.json"),
-  ]);
-
-  if (!pointsRes.ok) throw new Error("points.json not found");
-
-  const data = await pointsRes.json();
-  points = normalizePoints(data);
+  const waterwaysRes = await fetch("data/waterways.json");
 
   if (isLiveSyncEnabled()) {
     try {
-      const remote = await fetchRemoteStatus();
-      mergeStatusUpdates(remote);
+      const remote = await fetchRemotePoints();
+      points = normalizePoints(remote);
+      if (!points.length) throw new Error("No valid points in sheet");
     } catch (err) {
-      console.warn("Could not load remote status, using local file defaults", err);
+      console.warn("Sheet load failed, using points.json fallback", err);
+      const pointsRes = await fetch("data/points.json");
+      if (!pointsRes.ok) throw err;
+      points = normalizePoints(await pointsRes.json());
+      showToast("Using backup data — check Google Sheet");
     }
   } else {
-    points = mergeWithStored(points);
+    const pointsRes = await fetch("data/points.json");
+    if (!pointsRes.ok) throw new Error("points.json not found");
+    points = mergeWithStored(normalizePoints(await pointsRes.json()));
   }
 
   saveToStorage();
@@ -240,8 +235,8 @@ async function loadFieldData() {
   startLiveSync();
   showToast(
     isLiveSyncEnabled()
-      ? `Loaded ${points.length} points — live sync on`
-      : `Loaded ${points.length} points, ${waterways.length} waterways`
+      ? `${points.length} points from Google Sheet`
+      : `Loaded ${points.length} points`
   );
 }
 

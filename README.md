@@ -1,28 +1,32 @@
 # Monsoon Portal
 
-Islamabad monsoon field clearance map — live status via Google Sheets.
+Islamabad monsoon field clearance map.
 
 **Live site:** https://monsoon-omega.vercel.app
 
-## Features
+## One file for everything: Google Sheet
 
-- 327 field points + waterways on OSM / hybrid / satellite map
-- Green = done, red = pending
-- Live team sync via Google Sheet (no database)
-- Mobile-friendly full-screen map with slide-up panel
+Your team edits **one Google Sheet** — the map updates automatically (~5 seconds). No redeploy, no Excel, no KMZ.
 
-## Data
+| Column | Required | Example |
+|--------|----------|---------|
+| id | Yes | sr-328 |
+| name | Yes | Culvert #328 |
+| category | Yes | Culvert |
+| latitude | Yes | 33.6844 |
+| longitude | Yes | 73.0479 |
+| status | Yes | pending / done |
 
-| Runtime (on Vercel) | Source |
-|---------------------|--------|
-| `data/points.json` | Map locations |
-| `data/waterways.json` | Nullah lines |
-| Google Sheet | Shared status (live sync) |
+Optional: sr, updatedAt, landmark, location, team, remarks
 
-Rebuild map data from Excel + KMZ: `python scripts/build-data.py`
+**Guide for field team:** `data/SHEET-GUIDE.txt`
 
-## Config
+## Waterways
 
-`js/config.js` — Google Apps Script Web App URL for live sync.
+Nullah lines still come from `data/waterways.json` (rarely changed).
 
-Setup: `scripts/google-apps-script/SETUP.txt`
+## Apps Script update (one time)
+
+If adding new points does not appear on map, update Apps Script:
+1. Extensions → Apps Script → paste `scripts/google-apps-script/Code.gs`
+2. Deploy → Manage deployments → Edit → **New version** → Deploy

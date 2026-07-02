@@ -1,21 +1,14 @@
 /**
- * Google Apps Script — shared status store (no database).
+ * Google Apps Script — full map data from sheet (no database).
  *
- * Works with:
- * - google-sheet-status.csv  (3 columns: id, status, updatedAt)
- * - google-sheet-all-points.csv  (full sheet — updates status + updatedAt columns)
+ * Sheet columns (row 1 headers):
+ * id | sr | name | category | latitude | longitude | status | updatedAt
+ * Optional: landmark, location, team, remarks, progress %
  *
- * SETUP:
- * 1. Paste your CSV into Google Sheet (row 1 = headers)
- * 2. Extensions → Apps Script → paste this file → Save
- * 3. Change SECRET below
- * 4. Deploy → New deployment → Web app (Execute as: Me, Anyone)
- * 5. Copy Web App URL into js/config.js
+ * Deploy: Web app → Execute as Me → Anyone can access
  */
 
 const SECRET = "cda-monsoon-2026";
-
-// Leave empty to use the first sheet tab. Or set e.g. "Sheet1" or "all_points"
 const SHEET_NAME = "";
 
 function jsonResponse(payload) {
@@ -44,7 +37,14 @@ function getColumnMap(headers) {
   return map;
 }
 
-function readStatusRows() {
+function pickColumn(cols, names) {
+  for (var i = 0; i < names.length; i++) {
+    if (cols[names[i]] !== undefined) return cols[names[i]];
+  }
+  return undefined;
+}
+
+function readAllPoints() {
   const sheet = getDataSheet();
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
@@ -52,26 +52,61 @@ function readStatusRows() {
   const headers = values[0];
   const cols = getColumnMap(headers);
 
-  if (cols.id === undefined || cols.status === undefined) {
-    throw new Error('Sheet must have "id" and "status" columns in row 1');
+  if (cols.id === undefined) {
+    throw new Error('Sheet must have an "id" column in row 1');
   }
 
-  const updatedCol = cols.updatedat !== undefined ? cols.updatedat : cols["updated at"];
+  const latCol = pickColumn(cols, ["latitude", "lat"]);
+  const lngCol = pickColumn(cols, ["longitude", "lng", "lon", "long"]);
+  const updatedCol = pickColumn(cols, ["updatedat", "updated at"]);
+  const progressCol = pickColumn(cols, ["progress %", "progress"]);
 
-  return values.slice(1).map(function (row) {
-    return {
-      id: String(row[cols.id] || ""),
-      status: String(row[cols.status] || "pending").toLowerCase(),
-      updatedAt: updatedCol !== undefined && row[updatedCol] ? String(row[updatedCol]) : "",
-    };
-  }).filter(function (row) {
-    return row.id;
-  });
+  if (latCol === undefined || lngCol === undefined) {
+    throw new Error('Sheet must have "latitude" and "longitude" columns');
+  }
+
+  return values
+    .slice(1)
+    .map(function (row, index) {
+      const id = String(row[cols.id] || "").trim();
+      if (!id) return null;
+
+      const lat = parseFloat(row[latCol]);
+      const lng = parseFloat(row[lngCol]);
+      if (!isFinite(lat) || !isFinite(lng)) return null;
+
+      const sr = cols.sr !== undefined && row[cols.sr] !== "" ? row[cols.sr] : index + 1;
+      const name =
+        cols.name !== undefined && row[cols.name]
+          ? String(row[cols.name])
+          : (cols.category !== undefined && row[cols.category]
+              ? String(row[cols.category]) + " #" + sr
+              : id);
+
+      return {
+        id: id,
+        sr: sr,
+        name: name,
+        category: cols.category !== undefined ? String(row[cols.category] || "") : "",
+        lat: lat,
+        lng: lng,
+        status: String(cols.status !== undefined ? row[cols.status] || "pending" : "pending").toLowerCase(),
+        updatedAt: updatedCol !== undefined && row[updatedCol] ? String(row[updatedCol]) : "",
+        landmark: cols.landmark !== undefined ? String(row[cols.landmark] || "") : "",
+        location: cols.location !== undefined ? String(row[cols.location] || "") : "",
+        team: cols.team !== undefined ? String(row[cols.team] || "") : "",
+        remarks: cols.remarks !== undefined ? String(row[cols.remarks] || "") : "",
+        progress: progressCol !== undefined ? row[progressCol] : 0,
+      };
+    })
+    .filter(function (row) {
+      return row;
+    });
 }
 
 function doGet() {
   try {
-    return jsonResponse(readStatusRows());
+    return jsonResponse(readAllPoints());
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err) });
   }
@@ -103,17 +138,22 @@ function updateStatus(id, status, updatedAt) {
   const cols = getColumnMap(headers);
 
   if (cols.id === undefined || cols.status === undefined) {
-    throw new Error('Sheet must have "id" and "status" columns in row 1');
+    throw new Error('Sheet must have "id" and "status" columns');
   }
 
-  const updatedCol = cols.updatedat !== undefined ? cols.updatedat : cols["updated at"];
+  const updatedCol = pickColumn(cols, ["updatedat", "updated at"]);
+  const progressCol = pickColumn(cols, ["progress %", "progress"]);
   const when = updatedAt || new Date().toISOString();
+  const displayStatus = status === "done" ? "done" : "pending";
 
   for (var i = 1; i < values.length; i++) {
     if (String(values[i][cols.id]) === String(id)) {
-      sheet.getRange(i + 1, cols.status + 1).setValue(status);
+      sheet.getRange(i + 1, cols.status + 1).setValue(displayStatus);
       if (updatedCol !== undefined) {
         sheet.getRange(i + 1, updatedCol + 1).setValue(when);
+      }
+      if (progressCol !== undefined) {
+        sheet.getRange(i + 1, progressCol + 1).setValue(status === "done" ? 100 : 0);
       }
       return;
     }

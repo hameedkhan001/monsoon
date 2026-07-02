@@ -1,0 +1,50 @@
+HOW TO ADD OR EDIT POINTS (for field team)
+==========================================
+
+The Google Sheet controls the live map. No redeploy needed.
+
+Required columns (row 1):
+  id | name | category | latitude | longitude | status
+
+Recommended columns:
+  sr | updatedAt | landmark | location | team | remarks
+
+ADD A NEW POINT
+---------------
+1. Open the Google Sheet
+2. Add a new row at the bottom
+3. Fill in:
+   id          → unique id, e.g. sr-328
+   name        → Culvert #328  (any label)
+   category    → Culvert  OR  Chowk Point  OR  Bridge  etc.
+   latitude    → 33.6844
+   longitude   → 73.0479
+   status      → pending  OR  done
+4. Save (Google saves automatically)
+5. Within ~5 seconds the point appears on the map for everyone
+
+EDIT A POINT
+------------
+Change latitude, longitude, name, category, or status in the sheet.
+Map updates within ~5 seconds.
+
+MARK DONE FROM MAP
+------------------
+Tap point → Mark as Done. Sheet updates automatically.
+
+CATEGORIES (for marker shape)
+-----------------------------
+  Culvert      → dash marker
+  Bridge       → square marker
+  Chowk Point  → circle marker
+  (others)     → circle marker
+
+STATUS VALUES
+-------------
+  done / yes / completed  → green on map
+  pending / no            → red on map
+
+IMPORTANT
+---------
+After updating Apps Script code, click Deploy → Manage deployments
+→ Edit → New version → Deploy (one time after code update).
