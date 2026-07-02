@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Monsoon Cleaning Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Monsoon Portal</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -13,7 +15,7 @@
       <span class="logo">🌧</span>
       <div>
         <h1>Monsoon Portal</h1>
-        <p class="subtitle">Islamabad field clearance tracker</p>
+        <p class="subtitle">Islamabad clearance</p>
       </div>
     </div>
     <div class="stats">
@@ -29,44 +31,36 @@
         <span class="stat-value" id="stat-pending">0</span>
         <span class="stat-label">Pending</span>
       </div>
-      <div class="stat">
+      <div class="stat stat-percent">
         <span class="stat-value" id="stat-percent">0%</span>
-        <span class="stat-label">Complete</span>
+        <span class="stat-label">Done</span>
       </div>
     </div>
     <div class="header-actions">
-      <span id="sync-badge" class="sync-badge sync-local">This device only</span>
-      <label class="btn btn-primary" for="excel-input">
-        Import Excel
-        <input type="file" id="excel-input" accept=".xlsx,.xls,.csv" hidden />
-      </label>
-      <button class="btn btn-secondary" id="btn-export" type="button">Export Status</button>
-      <button class="btn btn-ghost" id="btn-reset" type="button" title="Reload field data">Reload Data</button>
+      <span id="sync-badge" class="sync-badge sync-local">Sync</span>
+      <button type="button" class="btn-panel-toggle" id="btn-panel-toggle" aria-label="Toggle panel">
+        ☰ Panel
+      </button>
     </div>
   </header>
 
-  <div id="setup-banner" class="setup-banner" hidden>
-    <strong>Team sync not active.</strong>
-    Connect Google Sheet so everyone sees status changes.
-    <a href="scripts/google-apps-script/SETUP.txt" target="_blank" rel="noopener">Setup guide</a>
-  </div>
-
   <main class="layout">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-handle" id="sidebar-handle"></div>
+
       <div class="sidebar-section">
-        <h2>Map View</h2>
-        <div class="layer-buttons" id="layer-buttons">
-          <button type="button" class="layer-btn active" data-layer="osm">Street (OSM)</button>
+        <h2>Map</h2>
+        <div class="layer-buttons">
+          <button type="button" class="layer-btn active" data-layer="osm">Street</button>
           <button type="button" class="layer-btn" data-layer="hybrid">Hybrid</button>
           <button type="button" class="layer-btn" data-layer="satellite">Satellite</button>
         </div>
       </div>
 
       <div class="sidebar-section">
-        <h2>Layers</h2>
         <label class="layer-toggle">
           <input type="checkbox" id="waterways-toggle" checked />
-          <span>Show waterways (nullah routes)</span>
+          <span>Waterways</span>
         </label>
       </div>
 
@@ -77,8 +71,8 @@
           <button type="button" class="filter-btn" data-filter="done">Done</button>
           <button type="button" class="filter-btn" data-filter="pending">Pending</button>
         </div>
-        <input type="search" id="search-input" class="search-input" placeholder="Search by name, Sr.#, category..." />
-        <select id="category-filter" class="search-input category-select" aria-label="Filter by category">
+        <input type="search" id="search-input" class="search-input" placeholder="Search..." />
+        <select id="category-filter" class="search-input category-select" aria-label="Category">
           <option value="all">All categories</option>
         </select>
       </div>
@@ -89,11 +83,10 @@
       </div>
 
       <div class="legend">
-        <span class="legend-item"><span class="dot dot-done"></span> Done (cleaned)</span>
-        <span class="legend-item"><span class="dot dot-pending"></span> Pending (not done)</span>
+        <span class="legend-item"><span class="dot dot-done"></span> Done</span>
+        <span class="legend-item"><span class="dot dot-pending"></span> Pending</span>
         <span class="legend-item"><span class="shape-icon shape-culvert pending"></span> Culvert</span>
         <span class="legend-item"><span class="shape-icon shape-bridge pending"></span> Bridge</span>
-        <span class="legend-item"><span class="line line-waterway"></span> Waterway / nullah</span>
       </div>
     </aside>
 
@@ -102,10 +95,10 @@
     </div>
   </main>
 
+  <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
   <div id="toast" class="toast" hidden></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
 </body>

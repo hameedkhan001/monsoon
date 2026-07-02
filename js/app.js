@@ -51,54 +51,6 @@ function normalizeStatus(value) {
   return "pending";
 }
 
-function parseCoordinate(value) {
-  const n = Number(String(value).replace(/,/g, "").trim());
-  return Number.isFinite(n) ? n : null;
-}
-
-function findColumn(row, candidates) {
-  const keys = Object.keys(row);
-  for (const candidate of candidates) {
-    const found = keys.find((k) => k.trim().toLowerCase() === candidate.toLowerCase());
-    if (found) return row[found];
-  }
-  for (const candidate of candidates) {
-    const found = keys.find((k) => k.trim().toLowerCase().includes(candidate.toLowerCase()));
-    if (found) return row[found];
-  }
-  return undefined;
-}
-
-function rowsToPoints(rows) {
-  return rows
-    .map((row, index) => {
-      const name =
-        findColumn(row, ["name", "kalwat", "location", "point", "site", "address"]) ??
-        `Point ${index + 1}`;
-      const lat = parseCoordinate(
-        findColumn(row, ["lat", "latitude", "y", "northing"])
-      );
-      const lng = parseCoordinate(
-        findColumn(row, ["lng", "lon", "long", "longitude", "x", "easting"])
-      );
-      const statusRaw = findColumn(row, ["status", "done", "cleaned", "completed", "yes/no", "yes"]);
-      const area = findColumn(row, ["area", "zone", "sector", "ward"]);
-
-      if (lat == null || lng == null) return null;
-
-      return {
-        id: makeId(name, lat, lng, index),
-        name: String(name).trim(),
-        lat,
-        lng,
-        status: normalizeStatus(statusRaw),
-        updatedAt: statusRaw ? new Date().toISOString() : undefined,
-        area: area ? String(area).trim() : undefined,
-      };
-    })
-    .filter(Boolean);
-}
-
 function mergeStatusUpdates(statusRows) {
   if (!statusRows.length) return false;
 
@@ -131,12 +83,6 @@ async function fetchRemoteStatus() {
   if (!res.ok) throw new Error("Failed to fetch status");
   const data = await res.json();
   return Array.isArray(data) ? data : [];
-}
-
-function updateSetupBanner() {
-  const banner = document.getElementById("setup-banner");
-  if (!banner) return;
-  banner.hidden = isLiveSyncEnabled();
 }
 
 async function pushStatusUpdate(point) {
@@ -180,8 +126,6 @@ async function syncFromSheet() {
 }
 
 function startLiveSync() {
-  updateSetupBanner();
-
   if (!isLiveSyncEnabled()) {
     setSyncBadge("local");
     return;
@@ -197,11 +141,11 @@ function setSyncBadge(state) {
   if (!el) return;
 
   const labels = {
-    live: "Live sync",
-    syncing: "Syncing…",
-    error: "Sync error",
-    local: "This device only",
-    saving: "Saving…",
+    live: "Live",
+    syncing: "…",
+    error: "Error",
+    local: "Local",
+    saving: "Saving",
   };
 
   el.textContent = labels[state] || labels.local;
@@ -510,6 +454,7 @@ function renderList() {
         map.setView([point.lat, point.lng], Math.max(map.getZoom(), 16));
         const marker = markerLayer.getLayers().find((m) => m.options.pointId === id);
         if (marker) marker.openPopup();
+        if (isMobile()) closeSidebar();
       }
       renderList();
     });
@@ -603,82 +548,7 @@ function setBaseLayer(name) {
   });
 }
 
-function handleExcelFile(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-      const imported = rowsToPoints(rows);
-
-      if (!imported.length) {
-        showToast("No valid points found. Check lat/lng columns.");
-        return;
-      }
-
-      points = mergeWithStored(imported);
-      selectedId = null;
-      saveToStorage();
-      refreshUI();
-      map.fitBounds(
-        imported.map((p) => [p.lat, p.lng]),
-        { padding: [40, 40], maxZoom: 15 }
-      );
-      showToast(`Imported ${imported.length} points from Excel`);
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to read Excel file");
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function exportStatus() {
-  if (!points.length) {
-    showToast("No data to export");
-    return;
-  }
-
-  const rows = points.map((p) => ({
-    "Sr.#": p.sr || "",
-    Category: p.category || "",
-    "Location / Area": p.area || "",
-    Landmark: p.landmark || "",
-    Status: p.status === "done" ? "Done" : "Pending",
-    "Progress %": p.status === "done" ? 100 : p.progress || 0,
-    Date: p.updatedAt ? new Date(p.updatedAt).toISOString().slice(0, 10) : p.date || "",
-    "Team / Supervisor": p.team || "",
-    Remarks: p.remarks || "",
-    Latitude: p.lat,
-    Longitude: p.lng,
-  }));
-
-  const sheet = XLSX.utils.json_to_sheet(rows);
-  const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, sheet, "Cleaning Status");
-  XLSX.writeFile(book, `monsoon-cleaning-status-${new Date().toISOString().slice(0, 10)}.xlsx`);
-  showToast("Status exported to Excel");
-}
-
 function bindEvents() {
-  document.getElementById("excel-input").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) handleExcelFile(file);
-    e.target.value = "";
-  });
-
-  document.getElementById("btn-export").addEventListener("click", exportStatus);
-  document.getElementById("btn-reset").addEventListener("click", () => {
-    const msg = isLiveSyncEnabled()
-      ? "Reload map data from points.json? Status stays in Google Sheet."
-      : "Reload field data from data/points.json? Your status updates are kept for matching points.";
-    if (confirm(msg)) {
-      loadFieldData();
-    }
-  });
-
   document.querySelectorAll(".layer-btn").forEach((btn) => {
     btn.addEventListener("click", () => setBaseLayer(btn.dataset.layer));
   });
@@ -706,6 +576,49 @@ function bindEvents() {
   document.getElementById("waterways-toggle").addEventListener("change", (e) => {
     setWaterwaysVisible(e.target.checked);
   });
+
+  document.getElementById("btn-panel-toggle")?.addEventListener("click", toggleSidebar);
+  document.getElementById("sidebar-backdrop")?.addEventListener("click", closeSidebar);
+  document.getElementById("sidebar-handle")?.addEventListener("click", closeSidebar);
+
+  window.addEventListener("resize", () => {
+    if (map) map.invalidateSize();
+  });
+}
+
+function isMobile() {
+  return window.matchMedia("(max-width: 768px)").matches;
+}
+
+function openSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (!sidebar) return;
+  sidebar.classList.add("open");
+  if (backdrop) {
+    backdrop.hidden = false;
+    backdrop.classList.add("visible");
+  }
+  setTimeout(() => map?.invalidateSize(), 320);
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (!sidebar) return;
+  sidebar.classList.remove("open");
+  if (backdrop) {
+    backdrop.classList.remove("visible");
+    backdrop.hidden = true;
+  }
+  setTimeout(() => map?.invalidateSize(), 320);
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  if (!sidebar) return;
+  if (sidebar.classList.contains("open")) closeSidebar();
+  else openSidebar();
 }
 
 async function init() {
@@ -714,6 +627,7 @@ async function init() {
 
   try {
     await loadFieldData();
+    setTimeout(() => map?.invalidateSize(), 100);
   } catch (err) {
     console.error(err);
     showToast("Could not load data/points.json — run scripts/build-data.py");
