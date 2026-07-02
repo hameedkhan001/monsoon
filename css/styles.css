@@ -14,6 +14,20 @@
   --sidebar-w: 320px;
 }
 
+.setup-banner {
+  background: #422006;
+  color: #fde68a;
+  border-bottom: 1px solid #854d0e;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.setup-banner a {
+  color: #fcd34d;
+  margin-left: 0.35rem;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -94,7 +108,23 @@ body {
   gap: 0.5rem;
   min-width: 220px;
   justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
 }
+
+.sync-badge {
+  font-size: 0.68rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.sync-local { color: var(--text-muted); background: var(--surface-2); }
+.sync-live { color: #86efac; background: rgba(34, 197, 94, 0.15); border-color: #166534; }
+.sync-syncing { color: #fde68a; background: rgba(234, 179, 8, 0.15); border-color: #854d0e; }
+.sync-saving { color: #fde68a; background: rgba(234, 179, 8, 0.15); border-color: #854d0e; }
+.sync-error { color: #fca5a5; background: rgba(239, 68, 68, 0.15); border-color: #991b1b; }
 
 .btn {
   border: none;

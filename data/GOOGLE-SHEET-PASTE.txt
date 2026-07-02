@@ -1,0 +1,52 @@
+GOOGLE SHEET — PASTE INSTRUCTIONS
+==================================
+
+You need ONE Google Sheet with a tab named exactly:  status
+
+STEP 1 — Create sheet
+---------------------
+1. Open https://sheets.google.com
+2. Blank spreadsheet
+3. Rename file: Monsoon Status
+
+STEP 2 — Paste data (choose ONE option)
+---------------------------------------
+
+OPTION A — Full sheet (what you did) ✓
+1. Open:  data/google-sheet-all-points.csv
+2. Copy all → Paste into cell A1 of your Google Sheet
+3. Keep row 1 headers: id, sr, name, category, latitude, longitude, status, updatedAt, ...
+4. First tab can stay named "Sheet1"
+
+OPTION B — Status-only (smaller sheet)
+1. Rename tab to:  status
+2. Paste:  data/google-sheet-status.csv  into A1
+   (only columns: id, status, updatedAt)
+
+CHECK: You should have 327 data rows (sr-1 to sr-327), not just 21.
+Scroll down in Google Sheet to confirm all rows pasted.
+
+STEP 4 — Connect Apps Script
+----------------------------
+1. Extensions → Apps Script
+2. Paste code from:  scripts/google-apps-script/Code.gs
+3. Change SECRET to your password
+4. Deploy → New deployment → Web app
+   - Execute as: Me
+   - Who has access: Anyone
+5. Copy the Web App URL
+
+STEP 5 — Send me
+----------------
+Share with me:
+  - Google Sheet link (optional, for viewing)
+  - Web App URL from step 4
+  - Your SECRET password (or set it yourself in js/config.js)
+
+I will put the Web App URL into js/config.js and push to Vercel.
+
+IMPORTANT
+---------
+- Row 1 must keep headers: id, status, updatedAt (and other columns if using full sheet)
+- Do not change the id column (sr-1, sr-2, ... sr-327)
+- All 327 rows must be present

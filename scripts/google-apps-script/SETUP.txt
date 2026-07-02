@@ -1,0 +1,38 @@
+CONNECT YOUR SHEET — 5 MINUTES
+==============================
+
+Your sheet:
+https://docs.google.com/spreadsheets/d/1RXK1qE33E7pYQt4lcUNyUQ1V4Favo2NzAk240vjByhE/edit
+
+The map CANNOT use the docs.google.com link directly.
+You must deploy Apps Script once to get a Web App URL.
+
+Steps (do this in your Google Sheet)
+------------------------------------
+1. Open your sheet (link above)
+2. Extensions → Apps Script
+3. Delete default code → paste ALL of Code.gs from this folder
+4. Change line: const SECRET = "cda-monsoon-2026";  (or pick your own password)
+5. Save project
+6. Deploy → New deployment
+   - Gear icon → Web app
+   - Execute as: Me
+   - Who has access: Anyone
+   - Deploy → Authorize → Allow
+7. COPY the Web App URL — it looks like:
+   https://script.google.com/macros/s/AKfycbxxxxxxxx/exec
+
+8. Open js/config.js in this project and paste that URL into sheetsApiUrl:
+   sheetsApiUrl: "https://script.google.com/macros/s/...../exec",
+
+9. Push to GitHub → redeploy Vercel
+
+Test
+----
+Open this URL in browser (replace with your Web App URL):
+https://script.google.com/macros/s/YOUR_ID/exec
+
+You should see JSON like:
+[{"id":"sr-1","status":"pending","updatedAt":""}, ...]
+
+If you see that, live sync will work on the map.

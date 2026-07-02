@@ -1,5 +1,16 @@
 const STORAGE_KEY = "cda-monsoon-cleaning-v1";
 
+function getConfig() {
+  return window.MONSOON_CONFIG || {};
+}
+
+function isLiveSyncEnabled() {
+  return Boolean(getConfig().sheetsApiUrl);
+}
+
+let syncTimer = null;
+let syncInFlight = false;
+
 /** @type {Array<{id:string,name:string,lat:number,lng:number,status:'done'|'pending',updatedAt?:string,area?:string}>} */
 let points = [];
 let waterways = [];
@@ -88,6 +99,115 @@ function rowsToPoints(rows) {
     .filter(Boolean);
 }
 
+function mergeStatusUpdates(statusRows) {
+  if (!statusRows.length) return false;
+
+  const byId = new Map(statusRows.map((row) => [row.id, row]));
+  let changed = false;
+
+  points = points.map((point) => {
+    const remote = byId.get(point.id);
+    if (!remote) return point;
+
+    const nextStatus = remote.status === "done" ? "done" : "pending";
+    if (point.status !== nextStatus || point.updatedAt !== remote.updatedAt) {
+      changed = true;
+      return {
+        ...point,
+        status: nextStatus,
+        updatedAt: remote.updatedAt || point.updatedAt,
+        progress: nextStatus === "done" ? 100 : point.progress,
+      };
+    }
+    return point;
+  });
+
+  return changed;
+}
+
+async function fetchRemoteStatus() {
+  const { sheetsApiUrl } = getConfig();
+  const res = await fetch(`${sheetsApiUrl}?t=${Date.now()}`);
+  if (!res.ok) throw new Error("Failed to fetch status");
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+function updateSetupBanner() {
+  const banner = document.getElementById("setup-banner");
+  if (!banner) return;
+  banner.hidden = isLiveSyncEnabled();
+}
+
+async function pushStatusUpdate(point) {
+  const { sheetsApiUrl, sheetsSecret } = getConfig();
+  const res = await fetch(sheetsApiUrl, {
+    method: "POST",
+    redirect: "follow",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      secret: sheetsSecret,
+      action: "updateStatus",
+      id: point.id,
+      status: point.status,
+      updatedAt: point.updatedAt,
+    }),
+  });
+
+  const result = await res.json();
+  if (!result.ok) throw new Error(result.error || "Sync failed");
+}
+
+async function syncFromSheet() {
+  if (!isLiveSyncEnabled() || syncInFlight) return;
+  syncInFlight = true;
+  setSyncBadge("syncing");
+
+  try {
+    const remote = await fetchRemoteStatus();
+    const changed = mergeStatusUpdates(remote);
+    if (changed) {
+      saveToStorage();
+      refreshUI();
+    }
+    setSyncBadge("live");
+  } catch (err) {
+    console.error(err);
+    setSyncBadge("error");
+  } finally {
+    syncInFlight = false;
+  }
+}
+
+function startLiveSync() {
+  updateSetupBanner();
+
+  if (!isLiveSyncEnabled()) {
+    setSyncBadge("local");
+    return;
+  }
+
+  syncFromSheet();
+  clearInterval(syncTimer);
+  syncTimer = setInterval(syncFromSheet, getConfig().syncIntervalMs || 5000);
+}
+
+function setSyncBadge(state) {
+  const el = document.getElementById("sync-badge");
+  if (!el) return;
+
+  const labels = {
+    live: "Live sync",
+    syncing: "Syncing…",
+    error: "Sync error",
+    local: "This device only",
+    saving: "Saving…",
+  };
+
+  el.textContent = labels[state] || labels.local;
+  el.className = `sync-badge sync-${state}`;
+}
+
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -148,7 +268,19 @@ async function loadFieldData() {
   if (!pointsRes.ok) throw new Error("points.json not found");
 
   const data = await pointsRes.json();
-  points = mergeWithStored(normalizePoints(data));
+  points = normalizePoints(data);
+
+  if (isLiveSyncEnabled()) {
+    try {
+      const remote = await fetchRemoteStatus();
+      mergeStatusUpdates(remote);
+    } catch (err) {
+      console.warn("Could not load remote status, using local file defaults", err);
+    }
+  } else {
+    points = mergeWithStored(points);
+  }
+
   saveToStorage();
 
   if (waterwaysRes.ok) {
@@ -160,7 +292,12 @@ async function loadFieldData() {
   populateCategoryFilter();
   refreshUI();
   fitMapToData();
-  showToast(`Loaded ${points.length} points, ${waterways.length} waterways`);
+  startLiveSync();
+  showToast(
+    isLiveSyncEnabled()
+      ? `Loaded ${points.length} points — live sync on`
+      : `Loaded ${points.length} points, ${waterways.length} waterways`
+  );
 }
 
 function fitMapToData() {
@@ -272,14 +409,38 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-function toggleStatus(id) {
+async function toggleStatus(id) {
   const point = points.find((p) => p.id === id);
   if (!point) return;
 
+  const previousStatus = point.status;
+  const previousUpdatedAt = point.updatedAt;
+
   point.status = point.status === "done" ? "pending" : "done";
   point.updatedAt = new Date().toISOString();
+  point.progress = point.status === "done" ? 100 : point.progress;
+
   saveToStorage();
   refreshUI();
+
+  if (isLiveSyncEnabled()) {
+    setSyncBadge("saving");
+    try {
+      await pushStatusUpdate(point);
+      setSyncBadge("live");
+      showToast(`${point.name} saved — team will see update`);
+    } catch (err) {
+      point.status = previousStatus;
+      point.updatedAt = previousUpdatedAt;
+      saveToStorage();
+      refreshUI();
+      setSyncBadge("error");
+      showToast("Could not save to shared sheet — try again");
+      console.error(err);
+    }
+    return;
+  }
+
   showToast(`${point.name} marked as ${point.status === "done" ? "done" : "pending"}`);
 }
 
@@ -510,7 +671,10 @@ function bindEvents() {
 
   document.getElementById("btn-export").addEventListener("click", exportStatus);
   document.getElementById("btn-reset").addEventListener("click", () => {
-    if (confirm("Reload field data from data/points.json? Your status updates are kept for matching points.")) {
+    const msg = isLiveSyncEnabled()
+      ? "Reload map data from points.json? Status stays in Google Sheet."
+      : "Reload field data from data/points.json? Your status updates are kept for matching points.";
+    if (confirm(msg)) {
       loadFieldData();
     }
   });

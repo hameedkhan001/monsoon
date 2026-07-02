@@ -44,7 +44,24 @@ Then click **Reload Data** in the portal (or refresh the page).
 - Click a point → **Mark as Done (Yes)**
 - **Export Status** → Excel with your tracker columns
 
-Status is saved in the browser. Use Export to share updates between machines.
+Status is saved in the browser unless **Google Sheets live sync** is configured (see below).
+
+## Live sync for whole team (no database)
+
+Vercel cannot save changes by itself. Use a **Google Sheet** as a free shared status file:
+
+1. Create a Google Sheet
+2. Deploy `scripts/google-apps-script/Code.gs` as a Web App (see `scripts/google-apps-script/SETUP.txt`)
+3. Put the Web App URL in `js/config.js` → `sheetsApiUrl`
+4. Redeploy Vercel
+
+Then:
+- Mark done on any phone → saved to Google Sheet
+- Other devices refresh every ~5 seconds
+- Mark not done → also saved permanently in the sheet
+- Coordinates still come from `points.json` on Vercel
+
+Badge in header: **Live sync** = team sharing on · **This device only** = localStorage only
 
 ## Notes
 
